@@ -1,0 +1,5 @@
+Window_months,Best_model,SC25_Peak_Forecast
+12,Ridge,149.4889602879874
+24,Ridge,133.44485902212605
+36,Ridge,137.17268784261398
+ensemble,mean,140.03550238424248

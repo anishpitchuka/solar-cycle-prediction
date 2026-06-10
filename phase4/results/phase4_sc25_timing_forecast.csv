@@ -1,0 +1,4 @@
+Window_months,Best_model,SC25_Rise_Time_forecast
+12,Ridge,60.5
+24,RandomForest,68.3
+36,RandomForest,63.5

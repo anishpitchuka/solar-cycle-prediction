@@ -1,0 +1,10 @@
+Model,MAE,RMSE,R2
+w36_RandomForest,5.96,7.57,0.6772
+w24_RandomForest,6.39,8.03,0.637
+w36_XGBoost,6.02,8.14,0.6273
+w36_Ridge,7.18,9.17,0.5266
+w24_Ridge,7.59,9.34,0.5095
+w24_XGBoost,7.42,9.35,0.5087
+w12_Ridge,9.71,12.51,0.1203
+w12_XGBoost,9.75,13.17,0.0247
+w12_RandomForest,10.17,13.25,0.013
