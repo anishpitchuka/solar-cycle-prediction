@@ -272,7 +272,24 @@ Standard k-fold or random splits would produce optimistically biased results by 
 
 * * *
 
-## 6\. Next Steps
+## 6\. Phase-over-Phase Improvement
+
+| Phase | Approach | MAE (months) | vs Phase 4 | vs Previous | Sign Accuracy | Post-peak Detection |
+| --- | --- | --- | --- | --- | --- | --- |
+| **4** | Static RF, 36m window, SSN only | 5.96 | — | — | N/A | N/A |
+| **6** | Static RF, 36m window, + F10.7 / Kp/Ap / Polar field | 5.11 | −14% | −14% | N/A | N/A |
+| **7 v1** | Running RF, pre-peak months only, raw SSN features | ~6.56 | −10% | +29% | ~70% | ❌ Failed |
+| **7 v2** | Running RF, full-cycle training, causal smooth features, signed target | **4.39** | **−26%** | **−33%** | **93.9%** | **95.4%** |
+
+**Key takeaways:**
+- Phase 6 showed that auxiliary solar indices add real signal (~14% gain) but hit diminishing returns due to N=24
+- Phase 7 v1 improved overall MAE slightly but was structurally broken post-peak — unusable for live forecasting
+- Phase 7 v2 is the strongest result: 26% better than the Phase 4 baseline and the only model that correctly identifies whether a cycle has already peaked
+
+* * *
+
+## 7\. Next Steps
+
 
 | Phase | Description | Notes |
 | --- | --- | --- |
@@ -282,7 +299,7 @@ Standard k-fold or random splits would produce optimistically biased results by 
 
 * * *
 
-## 7\. Phase Completion Summary
+## 8\. Phase Completion Summary
 
 | Phase | Description | Status | Best Result |
 | --- | --- | --- | --- |
