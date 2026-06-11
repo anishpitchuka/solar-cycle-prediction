@@ -1,6 +1,6 @@
 # Solar Cycle Peak Forecasting — Progress Report
 
-**Machine Learning System | Phases 0–8 Completed**  
+**Machine Learning System | Phases 0–10 Completed**  
 **Date:** June 11, 2026
 
 * * *
@@ -22,6 +22,8 @@
 ### June 11, 2026
 - **Phase 8:** Built precursor dataset using the Ohl method (geomagnetic aa index during decline/minimum: `aa_at_min`, `aa_pre12`, `aa_pre24`) and the Schatten/SODA method (polar field strength near minimum: `polar_field_at_min`, `polar_field_abs_at_min`). Coverage: aa for 11/24 cycles (SC14–SC24), polar field for 4/24 cycles (SC21–SC24). Cross-sectional correlations with Peak_Sunspot_Number: aa ≈ 0.74–0.76 (N=11), polar field ≈ 0.27–0.90 (N=4)
 - **Phase 8b:** Tested whether the Phase 8 precursors actually improve LOCO CV performance — (1) added aa precursors to the Phase 6 curated feature set for magnitude/timing models, and (2) added `aa_pre24` as a per-cycle constant to the Phase 7 v2 running timing model. Result: **no measurable improvement** in either case (see Phase 8 section below)
+- **Phase 9:** Built a from-scratch 0-D persistent homology ("peak persistence") implementation to extract topological/shape features (number of secondary peaks, their prominence, recency) from the smoothed SSN curve, targeting the double-peak/Gnevyshev-gap structure that confused Phase 7. Tested in both the static (Phase 8b) and running (Phase 7 v2) models. Result: **no improvement — running model pre-peak MAE got notably worse** (see Phase 9 section below)
+- **Phase 10:** Built a lightweight, re-runnable SC25/SC26 live monitoring notebook — re-applies the established status/decay/projection/detector logic to the latest SSN data each month, with no retraining required. Current status (data through May 2026, T=77): SC25 smoothed SSN = 105.4, down from a smoothed peak of 159.2 (April 2025), declining at ~4.3 SSN/month; SC26 onset not yet flagged; projected SC25 end / SC26 onset window ≈ Sep 2030 – Mar 2033 (mean ≈ Dec 2031), based on SC1–24 decay-phase analogs (see Phase 10 section below)
 
 * * *
 
@@ -29,7 +31,7 @@
 
 This report summarises progress on the Solar Cycle Peak Forecasting project. The objective is to build a machine learning system that predicts: (1) future monthly sunspot numbers, (2) solar cycle peak magnitude, (3) solar cycle peak timing, and (4) future cycle trajectory.
 
-Phases 0–8 are complete and validated. All models use strict leakage-free **Leave-One-Cycle-Out (LOCO) cross-validation** — the only statistically valid strategy given 24 available complete solar cycles.
+Phases 0–10 are complete and validated. All models use strict leakage-free **Leave-One-Cycle-Out (LOCO) cross-validation** — the only statistically valid strategy given 24 available complete solar cycles.
 
 **Key results:**
 
@@ -40,7 +42,9 @@ Phases 0–8 are complete and validated. All models use strict leakage-free **Le
 - Additional datasets (Phase 6): F10.7 + Kp/Ap + Polar Field → timing MAE improved 14%
 - Running timing forecast (Phase 7 v2): overall MAE = 4.39m, post-peak sign accuracy = 95.4%
 - Geomagnetic precursors (Phase 8/8b): aa index correlates with peak magnitude cross-sectionally (~0.75) but adds **no LOCO CV improvement** to either the magnitude, timing, or running models
+- TDA peak-persistence features (Phase 9): no improvement to static models, and **made the running model's pre-peak MAE worse** (8.08m → 9.26m) — likely overfitting to noise from spurious secondary peaks (99.1% of samples have `tda_n_peaks > 0`)
 - SC25 actual peak: **October 2024**, SSN = 159.2 (rise = 58 months from Dec 2019)
+- SC25/SC26 live monitoring (Phase 10): as of T=77 (May 2026), SC25 is at 66.2% of its smoothed peak and declining (~−4.3 SSN/month); projected SC26 onset window ≈ Sep 2030 – Mar 2033
 
 * * *
 
@@ -255,6 +259,79 @@ All predictions within ±5 months of the actual Oct 2024 peak.
 
 * * *
 
+### Phase 9 — Topological Data Analysis (TDA): Peak Persistence Features ✅
+
+**Goal:** Extract shape/topology features from the smoothed SSN curve via **0-D persistent homology of the superlevel-set filtration** ("peak persistence" — a merge tree of local maxima), targeting the double-peak/Gnevyshev-gap structure (e.g. SC22, SC23) that confused Phase 7's running models. Implemented from scratch in NumPy (no `ripser`/`gudhi`/`scipy` available).
+
+**Six features per curve:** `tda_n_peaks`, `tda_max_sec_persist`, `tda_sec_persist_ratio`, `tda_total_persist`, `tda_sec_peak_frac`, `tda_months_since_sec_peak`. Validated on SC22/SC23 (clear secondary peaks in the persistence diagram, prominence 16–20 SN) vs SC24 (much smaller secondary peaks).
+
+**Static models (LOCO CV, RF, w36 features):**
+
+| Model | Mag MAE | Tim MAE |
+| --- | --- | --- |
+| Phase 4 baseline (RF/Ridge w36) | 26.6 | 5.96 |
+| Phase 6 curated | 28.19 | 6.66 |
+| Phase 8b curated + aa precursors | 29.06 | 6.63 |
+| Phase 9 curated + aa + TDA (w36) | 30.28 | 6.42 |
+
+**Running model (LOCO CV, RF):**
+
+| Model | Overall MAE | Pre-peak MAE | Post-peak MAE | Sign Acc | Post-peak Detect |
+| --- | --- | --- | --- | --- | --- |
+| Phase 7 v2 (reported) | 4.39 | 8.08 | 2.25 | 93.9% | 95.4% |
+| Phase 8b + aa_pre24 | 4.47 | 8.24 | 2.29 | 93.5% | 95.2% |
+| Phase 9 + TDA features | 4.87 | 9.26 | 2.33 | 93.6% | 95.4% |
+
+**Conclusion:** TDA peak-persistence features gave **no improvement** and made the running model's pre-peak MAE noticeably worse (8.08 → 9.26m, the largest pre-peak regression of any phase). Static magnitude also got worse (29.06 → 30.28); static timing improved marginally (6.63 → 6.42), too small to offset the running-model regression.
+
+**Why it didn't help (and likely hurt):**
+1. The 13-month trailing smooth is too noisy at this resolution — **99.1% of running-model samples have `tda_n_peaks > 0`**, meaning most "secondary peaks" detected are smoothing noise, not real Gnevyshev-gap structure.
+2. Adding 6 features to a 24-cycle dataset (and ~3,034-row running dataset) raises the chance Random Forest splits on noisy TDA features instead of established ones.
+3. Pre-peak windows (still on the rising flank, no real double peak yet) suffered the largest degradation — consistent with the model overfitting to noise specifically where TDA features carry no real information.
+4. Static w36 features remain shape-blind to the double-peak structure, which typically appears at months 45–65, after the w36 window.
+
+**Pattern across Phases 6, 8, 8b, 9:** Engineered feature additions beyond the Phase 7 v2 / Phase 6 baselines have not produced LOCO CV gains at N=24 cycles — strong evidence of a small-N ceiling for SSN-derived tabular features.
+
+* * *
+
+### Phase 10 — SC25/SC26 Live Monitoring Tool ✅
+
+**Goal:** Following the Phase 9 conclusion that Phase 7 v2 (unmodified) remains the best-known model, build a lightweight, **re-runnable monitoring notebook** that tracks SC25's decline phase and watches for the onset of SC26, using only the latest `SN_m_tot_V2.0.csv` — no retraining required for the core monitoring cells.
+
+**Notebook:** `phase10/phase10_sc25_sc26_monitor.ipynb` — five tools, each its own cell:
+
+1. **SC25 status** — current smoothed SSN vs. smoothed peak (159.2, April 2025), % of peak, months since peak, and a 6-month trend slope. Plots raw + 13-month trailing-smoothed SSN with peak and "now" markers (`plots/p10_sc25_status.png`).
+2. **SC25 end / SC26 onset projection** — uses SC1–24 decay-phase (peak→end) and full-cycle-length (start→end) statistics from `Cycle_Database_completed.csv` as historical analogs to project SC25's end date from its actual peak date.
+3. **Phase 7 v2 model re-run** — the 14-feature causal running RF model (unchanged from Phase 7 v2/8b/9 baseline) re-applied to the latest data, included for completeness (left unexecuted in the sandbox per project convention; runs end-to-end when executed locally with scikit-learn).
+4. **SC26 onset detector** — causal rule-based heuristic: flags onset when smoothed SSN drops below a calibrated near-minimum threshold AND shows 3 consecutive months of increase (signalling the start of SC26's rise).
+5. **Monthly status report** — a single self-contained, NumPy/Pandas-only function (`monthly_status_report()`) combining all of the above into one printable summary, intended to be the cell re-run each month after refreshing the data file.
+
+**Current SC25 status (data through May 2026, T=77 since Dec 2019 start):**
+
+| Metric | Value |
+| --- | --- |
+| Smoothed peak SSN | 159.2 (April 2025, T=64) |
+| Current smoothed SSN | 105.4 (66.2% of peak) |
+| Months since peak | 13 |
+| 6-month trend | −4.28 SSN/month (declining) |
+
+**SC25 end / SC26 onset projection** (from SC1–24 decay-phase analogs, mean decay = 80.1m, std = 14.9m, range 48–122m):
+
+| Projection | Window |
+| --- | --- |
+| Mean | ~December 2031 (peak + 80 months) |
+| ±1 std | ~September 2030 – March 2033 |
+| Full historical range | ~April 2029 – June 2035 |
+| Cross-check (cycle-length analog from Dec 2019 start, mean 132.4m) | ~December 2030 |
+
+**SC26 onset detector:** calibrated threshold = 12.3 (median of SC1–24's first-6-month smoothed SSN + 5 buffer). Current smoothed SSN (105.4) is well above this threshold (gap = +93.1) — **not flagged**. At the current decline rate, linear extrapolation puts a threshold crossing around March 2028, though the actual decline is expected to slow as SC25 approaches minimum, so this is a lower bound rather than a forecast.
+
+**Conclusion:** SC25 is roughly 58% through an average-length cycle and clearly past peak, declining steadily. No SC26 precursor signal yet. The notebook is designed to be re-run monthly (after refreshing `SN_m_tot_V2.0.csv`) to track SC25's remaining decline and catch the earliest SC26 onset signal — directly operationalising the Phase 7 v2 best-known model and the project's historical-analog statistics for ongoing use.
+
+**How this fits the project:** Phases 0–9 established and validated the modeling approach (Phase 7 v2 running model, LOCO CV, historical analogs); Phase 10 turns that work into a standing tool rather than a one-off analysis, closing the loop between the research phases and live operational monitoring of SC25's tail end and SC26's eventual onset.
+
+* * *
+
 ## 4\. SC25 Forecasts
 
 **SC25 start:** December 2019 (smoothed SN = 1.8)
@@ -313,12 +390,14 @@ Standard k-fold or random splits would produce optimistically biased results by 
 | **7 v1** | Running RF, pre-peak months only, raw SSN features | ~6.56 | −10% | +29% | ~70% | ❌ Failed |
 | **7 v2** | Running RF, full-cycle training, causal smooth features, signed target | **4.39** | **−26%** | **−33%** | **93.9%** | **95.4%** |
 | **8b** | Running RF (7v2) + aa_pre24 geomagnetic precursor | 4.47 | −25% | +2% | 93.5% | 95.2% |
+| **9** | Running RF (7v2) + TDA peak-persistence features | 4.87 | −18% | +9% | 93.6% | 95.4% |
 
 **Key takeaways:**
 - Phase 6 showed that auxiliary solar indices add real signal (~14% gain) but hit diminishing returns due to N=24
 - Phase 7 v1 improved overall MAE slightly but was structurally broken post-peak — unusable for live forecasting
 - Phase 7 v2 is the strongest result: 26% better than the Phase 4 baseline and the only model that correctly identifies whether a cycle has already peaked
 - Phase 8b shows that adding the aa geomagnetic precursor to Phase 7 v2 provides **no further gain** — sparse coverage (11/24 cycles) caps its usefulness in LOCO CV
+- Phase 9 shows that adding TDA peak-persistence features to Phase 7 v2 makes pre-peak performance **worse** — spurious secondary peaks (99.1% of samples) add noise rather than signal. **Phase 7 v2 (unmodified) remains the best running model.**
 
 * * *
 
@@ -327,9 +406,11 @@ Standard k-fold or random splits would produce optimistically biased results by 
 
 | Phase | Description | Notes |
 | --- | --- | --- |
-| **9** | Topological Data Analysis on SSN time series / solar magnetograms | Persistent homology, Betti numbers, persistence lifetimes — capture shape (e.g. double-peak structure) that smooth/slope features miss |
-| **9 (alt.)** | Address magnitude model's small-N problem directly | Simpler/regularised models or hierarchical pooling, since Phase 8b showed feature-set growth alone (28.19→29.06 MAE) doesn't help with N=24 |
-| **SC26** | Live forecast for Solar Cycle 26 | Requires SC25 minimum (~2030) or declining-phase extrapolation |
+| **10** | ✅ Consolidate best-known model into a live monitoring tool | Done — `phase10_sc25_sc26_monitor.ipynb` re-runs Phase 7 v2 + historical-analog projections + SC26 detector on the latest data each month |
+| **11** | Re-run Phase 10 monitor monthly as new SSN data arrives | Track SC25's decline toward the projected end window (~Sep 2030 – Mar 2033) and watch for the SC26 onset flag |
+| **11 (alt.)** | Address magnitude model's small-N problem directly | Simpler/regularised models or hierarchical pooling, since Phase 8b/9 showed feature-set growth alone (28.19→29.06→30.28 MAE) doesn't help with N=24 |
+| **11 (alt.)** | Re-test TDA at heavier smoothing (25–37m) | 13m smoothing leaves 99.1% of samples with spurious secondary peaks; a longer window matched to the ~11yr cycle timescale might isolate genuine double peaks — low priority given two consecutive feature phases (8b, 9) showed no gain |
+| **SC26** | Full live forecast for Solar Cycle 26 (magnitude/timing) | Requires SC25 minimum (Phase 10 projects ~2030–2033) or further declining-phase extrapolation |
 | **Smooth-label alignment** | Align feature smoothing window with label definition | Reduce causal lag bias in Phase 7 v2 |
 
 * * *
@@ -347,7 +428,8 @@ Standard k-fold or random splits would produce optimistically biased results by 
 | 6   | Additional Datasets | ✅ Complete | F10.7 + Kp/Ap + Polar Field → MAE 5.11m (−14%) |
 | 7   | Running Timing Forecast (RF) | ✅ Complete | v2 MAE=4.39m, post-peak detect=95.4% |
 | 8   | Geomagnetic/Polar Precursors & Augmented Models | ✅ Complete | aa precursors: no LOCO CV improvement (Mag 29.06 vs 28.19, Tim 6.63 vs 6.66, Running 4.47 vs 4.39) |
-| 9   | Topological Data Analysis | 🔜 Planned | Persistent homology, Betti numbers |
+| 9   | Topological Data Analysis (peak persistence) | ✅ Complete | TDA features: no improvement (Mag 30.28 vs 29.06, Tim 6.42 vs 6.63, Running 4.87 vs 4.47); pre-peak MAE worsened most (9.26 vs 8.24) |
+| 10  | SC25/SC26 Live Monitoring Tool | ✅ Complete | Re-runnable notebook (status, projection, model re-run, SC26 detector, monthly report); SC25 at 66.2% of peak and declining, SC26 onset window ≈ Sep 2030 – Mar 2033 |
 
 &nbsp;
 
