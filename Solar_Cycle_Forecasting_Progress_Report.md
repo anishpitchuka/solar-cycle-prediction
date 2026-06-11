@@ -1,7 +1,7 @@
 # Solar Cycle Peak Forecasting — Progress Report
 
-**Machine Learning System | Phases 0–7 Completed**  
-**Date:** June 9, 2026
+**Machine Learning System | Phases 0–8 Completed**  
+**Date:** June 11, 2026
 
 * * *
 
@@ -19,13 +19,17 @@
 - Added Cell 10 to Phase 7 v2 notebook: window size comparison graph (Phase 7 v2 per-T MAE line vs Phase 4 w12/w24/w36 reference points)
 - Verified SC25 running forecast table (T=12 to T=77, all within ±5m of actual Oct 2024 peak)
 
+### June 11, 2026
+- **Phase 8:** Built precursor dataset using the Ohl method (geomagnetic aa index during decline/minimum: `aa_at_min`, `aa_pre12`, `aa_pre24`) and the Schatten/SODA method (polar field strength near minimum: `polar_field_at_min`, `polar_field_abs_at_min`). Coverage: aa for 11/24 cycles (SC14–SC24), polar field for 4/24 cycles (SC21–SC24). Cross-sectional correlations with Peak_Sunspot_Number: aa ≈ 0.74–0.76 (N=11), polar field ≈ 0.27–0.90 (N=4)
+- **Phase 8b:** Tested whether the Phase 8 precursors actually improve LOCO CV performance — (1) added aa precursors to the Phase 6 curated feature set for magnitude/timing models, and (2) added `aa_pre24` as a per-cycle constant to the Phase 7 v2 running timing model. Result: **no measurable improvement** in either case (see Phase 8 section below)
+
 * * *
 
 ## 1\. Executive Summary
 
 This report summarises progress on the Solar Cycle Peak Forecasting project. The objective is to build a machine learning system that predicts: (1) future monthly sunspot numbers, (2) solar cycle peak magnitude, (3) solar cycle peak timing, and (4) future cycle trajectory.
 
-Seven of eight planned phases are complete and validated. All models use strict leakage-free **Leave-One-Cycle-Out (LOCO) cross-validation** — the only statistically valid strategy given 24 available complete solar cycles.
+Phases 0–8 are complete and validated. All models use strict leakage-free **Leave-One-Cycle-Out (LOCO) cross-validation** — the only statistically valid strategy given 24 available complete solar cycles.
 
 **Key results:**
 
@@ -35,6 +39,7 @@ Seven of eight planned phases are complete and validated. All models use strict 
 - Trajectory forecasting (GRU/LSTM/TCN): trajectory MAE ≈ 25 SN units
 - Additional datasets (Phase 6): F10.7 + Kp/Ap + Polar Field → timing MAE improved 14%
 - Running timing forecast (Phase 7 v2): overall MAE = 4.39m, post-peak sign accuracy = 95.4%
+- Geomagnetic precursors (Phase 8/8b): aa index correlates with peak magnitude cross-sectionally (~0.75) but adds **no LOCO CV improvement** to either the magnitude, timing, or running models
 - SC25 actual peak: **October 2024**, SSN = 159.2 (rise = 58 months from Dec 2019)
 
 * * *
@@ -223,6 +228,33 @@ All predictions within ±5 months of the actual Oct 2024 peak.
 
 * * *
 
+### Phase 8 — Geomagnetic/Polar Precursors & Augmented Model Testing ✅
+
+**Goal:** Test two classic solar-cycle precursor methods, then check whether they actually improve LOCO CV performance once added to the existing feature sets.
+
+**Phase 8 — precursor dataset:**
+- **Ohl method:** averaged geomagnetic aa index during the declining phase/minimum (`aa_at_min`, `aa_pre12`, `aa_pre24` — 12/24-month trailing windows before cycle start)
+- **Schatten/SODA method:** averaged polar field strength near minimum (`polar_field_at_min`, `polar_field_abs_at_min`)
+- Coverage: aa index for 11/24 cycles (SC14–SC24), polar field for 4/24 cycles (SC21–SC24)
+- Cross-sectional correlation with `Peak_Sunspot_Number`: aa ≈ 0.74–0.76 (N=11), polar field ≈ 0.27–0.90 (N=4)
+
+**Phase 8b — augmented model comparison (LOCO CV):**
+
+| Model | Mag MAE | Tim MAE |
+| --- | --- | --- |
+| Phase 4 baseline (RF/Ridge w36) | 26.6 | 5.96 |
+| Phase 6 curated (F10.7 + Kp/Ap + Polar field) | 28.19 | 6.66 |
+| Phase 8b curated + aa precursors | 29.06 | 6.63 |
+
+| Model | Overall MAE | Pre-peak MAE | Post-peak MAE | Sign Acc | Post-peak Detect |
+| --- | --- | --- | --- | --- | --- |
+| Phase 7 v2 (reported) | 4.39 | 8.08 | 2.25 | 93.9% | 95.4% |
+| Phase 8b + aa_pre24 | 4.47 | 8.24 | 2.29 | 93.5% | 95.2% |
+
+**Conclusion:** The aa precursor features gave **no measurable benefit** in either architecture — slightly worse for magnitude, essentially flat for timing, and marginally worse across all five Phase 7 v2 running-model metrics (including the targeted early pre-peak window, T<24m). Likely cause: `aa_pre24` only covers 11/24 cycles, so the other 13 cycles are filled with the train-fold median, adding noise rather than signal in a LOCO setting. The strong cross-sectional correlation seen in Phase 8 does not survive once the feature competes with 14+ existing SSN-derived features.
+
+* * *
+
 ## 4\. SC25 Forecasts
 
 **SC25 start:** December 2019 (smoothed SN = 1.8)
@@ -280,11 +312,13 @@ Standard k-fold or random splits would produce optimistically biased results by 
 | **6** | Static RF, 36m window, + F10.7 / Kp/Ap / Polar field | 5.11 | −14% | −14% | N/A | N/A |
 | **7 v1** | Running RF, pre-peak months only, raw SSN features | ~6.56 | −10% | +29% | ~70% | ❌ Failed |
 | **7 v2** | Running RF, full-cycle training, causal smooth features, signed target | **4.39** | **−26%** | **−33%** | **93.9%** | **95.4%** |
+| **8b** | Running RF (7v2) + aa_pre24 geomagnetic precursor | 4.47 | −25% | +2% | 93.5% | 95.2% |
 
 **Key takeaways:**
 - Phase 6 showed that auxiliary solar indices add real signal (~14% gain) but hit diminishing returns due to N=24
 - Phase 7 v1 improved overall MAE slightly but was structurally broken post-peak — unusable for live forecasting
 - Phase 7 v2 is the strongest result: 26% better than the Phase 4 baseline and the only model that correctly identifies whether a cycle has already peaked
+- Phase 8b shows that adding the aa geomagnetic precursor to Phase 7 v2 provides **no further gain** — sparse coverage (11/24 cycles) caps its usefulness in LOCO CV
 
 * * *
 
@@ -293,7 +327,8 @@ Standard k-fold or random splits would produce optimistically biased results by 
 
 | Phase | Description | Notes |
 | --- | --- | --- |
-| **8** | Topological Data Analysis on solar magnetograms | Persistent homology, Betti numbers, persistence lifetimes |
+| **9** | Topological Data Analysis on SSN time series / solar magnetograms | Persistent homology, Betti numbers, persistence lifetimes — capture shape (e.g. double-peak structure) that smooth/slope features miss |
+| **9 (alt.)** | Address magnitude model's small-N problem directly | Simpler/regularised models or hierarchical pooling, since Phase 8b showed feature-set growth alone (28.19→29.06 MAE) doesn't help with N=24 |
 | **SC26** | Live forecast for Solar Cycle 26 | Requires SC25 minimum (~2030) or declining-phase extrapolation |
 | **Smooth-label alignment** | Align feature smoothing window with label definition | Reduce causal lag bias in Phase 7 v2 |
 
@@ -311,7 +346,8 @@ Standard k-fold or random splits would produce optimistically biased results by 
 | 5   | Trajectory Forecasting (DL) | ✅ Complete | TCN Traj MAE≈25 SN |
 | 6   | Additional Datasets | ✅ Complete | F10.7 + Kp/Ap + Polar Field → MAE 5.11m (−14%) |
 | 7   | Running Timing Forecast (RF) | ✅ Complete | v2 MAE=4.39m, post-peak detect=95.4% |
-| 8   | Topological Data Analysis | 🔜 Planned | Persistent homology, Betti numbers |
+| 8   | Geomagnetic/Polar Precursors & Augmented Models | ✅ Complete | aa precursors: no LOCO CV improvement (Mag 29.06 vs 28.19, Tim 6.63 vs 6.66, Running 4.47 vs 4.39) |
+| 9   | Topological Data Analysis | 🔜 Planned | Persistent homology, Betti numbers |
 
 &nbsp;
 
