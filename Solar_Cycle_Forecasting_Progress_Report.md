@@ -315,6 +315,8 @@ All predictions within ±5 months of the actual Oct 2024 peak.
 | Months since peak | 13 |
 | 6-month trend | −4.28 SSN/month (declining) |
 
+> **Note on peak date (April 2025 vs. October 2024):** Both dates refer to the same smoothed peak value (159.2) and the same ~13-month high-activity window — they differ only in smoothing convention. Phases 0–9 used a **centered** 13-month smooth, which places the peak at the midpoint of that window (October 2024). Phase 10 uses a **trailing/causal** 13-month smooth (required for live monitoring, since future months aren't available), which places the same value at the end of the window (April 2025). Neither date is "wrong" — they're two labels for the same underlying peak.
+
 **SC25 end / SC26 onset projection** (from SC1–24 decay-phase analogs, mean decay = 80.1m, std = 14.9m, range 48–122m):
 
 | Projection | Window |
