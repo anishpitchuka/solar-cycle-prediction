@@ -14,6 +14,7 @@ For full results, methodology, and conclusions for every phase, see **[`Solar_Cy
 - [Live monitoring (Phase 10)](#live-monitoring-phase-10)
 - [Key takeaways](#key-takeaways)
 - [Data sources](#data-sources)
+- [License](#license)
 
 ## Project status
 
@@ -143,3 +144,7 @@ Both produce the same smoothed values for the same underlying data — they just
 - SILSO Version 2.0 Monthly Sunspot Number (Royal Observatory of Belgium), Jan 1749–present
 - Geomagnetic aa index (1900–2024)
 - F10.7 solar radio flux, Kp/Ap geomagnetic indices, solar polar field strength
+
+## License
+
+This project's code and documentation are licensed under the [MIT License](LICENSE). Note that the underlying SILSO sunspot data and other third-party datasets retain their own usage terms — see [Data sources](#data-sources).
