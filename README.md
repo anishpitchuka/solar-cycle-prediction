@@ -4,6 +4,17 @@ A machine learning project that forecasts the **magnitude, timing, and trajector
 
 For full results, methodology, and conclusions for every phase, see **[`Solar_Cycle_Forecasting_Progress_Report.md`](Solar_Cycle_Forecasting_Progress_Report.md)**. The original scope is in [`Solar_Cycle_Peak_Forecasting_Project_Plan (1).md`](<Solar_Cycle_Peak_Forecasting_Project_Plan (1).md>).
 
+## Contents
+
+- [Project status](#project-status)
+- [Requirements](#requirements)
+- [Pipeline overview](#pipeline-overview)
+- [Repository structure](#repository-structure)
+- [Why 13-month smoothing?](#why-13-month-smoothing)
+- [Live monitoring (Phase 10)](#live-monitoring-phase-10)
+- [Key takeaways](#key-takeaways)
+- [Data sources](#data-sources)
+
 ## Project status
 
 **Phases 0–10 complete.** All models use leakage-free Leave-One-Cycle-Out (LOCO) cross-validation across the 24 completed solar cycles (SC1–SC24), with SC25 as the live forecast target.
@@ -17,6 +28,59 @@ For full results, methodology, and conclusions for every phase, see **[`Solar_Cy
 - Geomagnetic precursors (Phase 8/8b) and TDA peak-persistence features (Phase 9): tested as feature additions to Phase 7 v2 — **neither improved performance** (small-N=24 ceiling)
 - SC25 actual peak: smoothed SSN = 159.2, April 2025
 - Live monitoring (Phase 10): as of May 2026, SC25 is at 66.2% of its peak and declining; projected SC26 onset window ≈ **Sep 2030 – Mar 2033**
+
+## Requirements
+
+This project uses standard Python data-science and ML libraries. Install them with:
+
+```bash
+pip install -r requirements.txt
+```
+
+`requirements.txt` includes:
+
+- `numpy`, `pandas` — data handling
+- `matplotlib` — plots
+- `scikit-learn` — Ridge, Random Forest, scaling, metrics
+- `xgboost` — gradient-boosted trees (Phase 1)
+- `torch` — GRU/LSTM/TCN trajectory models (Phase 5)
+- `jupyter` — to run the notebooks
+
+All notebooks were built and run with Python 3.10.
+
+## Pipeline overview
+
+```mermaid
+flowchart TD
+    A["Raw SSN data\nSN_m_tot_V2.0.csv (SILSO)"] --> B["Phase 0\nEDA & cleaning"]
+    B --> C["Phase 1\nMonthly SSN forecasting"]
+    B --> D["Phase 2\nCycle database\n(25 cycles x 58 features)"]
+    D --> E["Phase 3\nPeak magnitude model"]
+    D --> F["Phase 4\nPeak timing model"]
+    F --> G["Phase 5\nTrajectory forecasting\n(GRU/LSTM/TCN)"]
+    F --> H["Phase 6\n+ F10.7 / Kp-Ap / Polar field"]
+    H --> I["Phase 7\nRunning timing v1\n(pre-peak only)"]
+    I --> J["Phase 7v2\nRunning timing, full-cycle\n(BEST MODEL)"]
+    J --> K["Phase 8 / 8b\n+ geomagnetic precursors\n(no improvement)"]
+    J --> L["Phase 9\n+ TDA peak-persistence\n(no improvement)"]
+    J --> M["Phase 10\nSC25/SC26 live monitor"]
+```
+
+**Phase 10 monthly monitoring loop:**
+
+```mermaid
+flowchart LR
+    A["Refresh\nSN_m_tot_V2.0.csv"] --> B["Re-run\nphase10 notebook"]
+    B --> C["SC25 status\n(current SSN vs. peak)"]
+    B --> D["SC25 end / SC26 onset\nprojection (historical analogs)"]
+    B --> E["SC26 onset detector\n(rule-based, causal)"]
+    C --> F["monthly_status_report()"]
+    D --> F
+    E --> F
+    F --> G{"SC26 onset\nflagged?"}
+    G -- "No" --> A
+    G -- "Yes" --> H["Update SC26 forecast\nwith new cycle data"]
+```
 
 ## Repository structure
 
